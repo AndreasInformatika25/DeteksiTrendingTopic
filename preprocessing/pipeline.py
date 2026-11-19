@@ -41,7 +41,7 @@ stop_manual = {
 }
 stop_words_set.update(stop_manual)
 
-# Context-Aware: Pertahankan kata negasi penting
+# Context-Aware: Pertahankan kata negasi penting untuk Sentimen
 kata_negasi = {'tidak', 'bukan', 'belum', 'jangan', 'kurang'}
 stop_words_final = stop_words_set - kata_negasi
 
@@ -75,9 +75,7 @@ def eksekusi_normalisasi(list_kata):
 
     kata_normal = []
     for kata in list_kata:
-        # Reduksi karakter berulang (misal: "nderrrr" -> "nder")
         teks_bersih = re.sub(r'(.)\1{2,}', r'\1', str(kata))
-        # Ganti dengan kata formal dari kamus jika ada
         kata_akhir = kamus_slang.get(teks_bersih, teks_bersih)
         kata_normal.append(kata_akhir)
 
@@ -100,7 +98,7 @@ def jalankan_pipeline(df, kolom_target='full_text', min_kata=3):
     # 1. Hapus Tweet Duplikat
     df_proses = df_proses.drop_duplicates(subset=[kolom_target], keep='first').reset_index(drop=True)
 
-    # 2. Cleaning & Case Folding
+    # 2. Cleaning & Case Folding (disimpan untuk NER & Sentiment)
     df_proses['clean_text'] = df_proses[kolom_target].apply(clean_text)
 
     # 3. Tokenisasi dasar & Normalisasi Kata
@@ -117,11 +115,9 @@ def jalankan_pipeline(df, kolom_target='full_text', min_kata=3):
             if term not in term_dict:
                 term_dict[term] = ""
 
-    # Stemming hanya dilakukan pada kata unik
     for term in term_dict:
         term_dict[term] = stemmer.stem(term)
 
-    # Mapping kembali kata hasil stemming ke dokumen
     df_proses['stemmed_list'] = df_proses['stopword_removed'].apply(
         lambda doc: [term_dict[term] for term in doc if term in term_dict]
     )
@@ -129,10 +125,10 @@ def jalankan_pipeline(df, kolom_target='full_text', min_kata=3):
     # 6. Gabungkan token jadi teks utuh & Filter Minimum Kata
     df_proses['final_text'] = df_proses['stemmed_list'].apply(lambda x: " ".join(x))
     df_proses['word_count'] = df_proses['final_text'].apply(lambda x: len(x.split()))
-    
+
     df_hasil = df_proses[df_proses['word_count'] >= min_kata].copy()
 
-    # Rapikan kolom sementara jika perlu
-    df_hasil = df_hasil.drop(columns=['clean_text', 'tokenized', 'normalized', 'stopword_removed', 'stemmed_list', 'word_count'])
+    # Pertahankan clean_text & final_text, buang kolom list sementara
+    df_hasil = df_hasil.drop(columns=['tokenized', 'normalized', 'stopword_removed', 'stemmed_list', 'word_count'])
 
     return df_hasil
